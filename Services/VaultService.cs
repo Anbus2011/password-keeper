@@ -104,7 +104,10 @@ public class VaultService : IDisposable
         File.WriteAllBytes(TempPath, encrypted);
 
         if (File.Exists(_vaultPath))
+        {
             File.Replace(TempPath, _vaultPath, _vaultPath + ".bak");
+            try { File.Delete(_vaultPath + ".bak"); } catch { }
+        }
         else
             File.Move(TempPath, _vaultPath);
     }
