@@ -2,19 +2,12 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using Pass.Services;
 
 namespace Pass.Forms;
 
 public class LoginForm : Form
 {
-    private static readonly Color BgColor = Color.FromArgb(245, 245, 245);
-    private static readonly Color SurfaceColor = Color.White;
-    private static readonly Color TextColor = Color.FromArgb(51, 51, 51);
-    private static readonly Color LabelColor = Color.FromArgb(100, 100, 100);
-    private static readonly Color AccentColor = Color.FromArgb(0, 120, 212);
-    private static readonly Color AccentHover = Color.FromArgb(0, 100, 180);
-    private static readonly Color BorderColor = Color.FromArgb(218, 220, 224);
-
     private static readonly Font MainFont = new("Segoe UI", 10f);
     private static readonly Font LabelFont = new("Segoe UI", 9f);
     private static readonly Font ButtonFont = new("Segoe UI Semibold", 9.5f);
@@ -25,12 +18,14 @@ public class LoginForm : Form
     private Button _unlockButton = null!;
     private Label _errorLabel = null!;
     private readonly bool _isNewVault;
+    private readonly string? _vaultName;
 
     public string MasterPassword { get; private set; } = "";
 
-    public LoginForm(bool isNewVault)
+    public LoginForm(bool isNewVault, string? vaultPath = null)
     {
         _isNewVault = isNewVault;
+        _vaultName = vaultPath != null ? System.IO.Path.GetFileNameWithoutExtension(vaultPath) : null;
         InitializeUI();
     }
 
@@ -40,7 +35,7 @@ public class LoginForm : Form
         using var g = Graphics.FromImage(bmp);
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(Color.Transparent);
-        using var pen = new Pen(Color.FromArgb(218, 165, 32), 2.2f);
+        using var pen = new Pen(Theme.GoldColor, 2.2f);
         g.DrawEllipse(pen, 2, 1, 12, 12);
         g.DrawEllipse(pen, 5, 4, 6, 6);
         g.DrawLine(pen, 12, 11, 27, 26);
@@ -52,13 +47,13 @@ public class LoginForm : Form
 
     private void InitializeUI()
     {
-        Text = _isNewVault ? "Create New Vault" : "Unlock Vault";
+        Text = _isNewVault ? "Create New Vault" : $"Unlock: {_vaultName ?? "Vault"}";
         Size = new Size(400, _isNewVault ? 320 : 250);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        BackColor = BgColor;
+        BackColor = Theme.BgColor;
         Font = MainFont;
         Icon = CreateKeyIcon();
 
@@ -67,11 +62,11 @@ public class LoginForm : Form
         {
             Location = new Point(20, 16),
             Size = new Size(Width - 56, Height - 80),
-            BackColor = SurfaceColor
+            BackColor = Theme.SurfaceColor
         };
         card.Paint += (_, e) =>
         {
-            using var pen = new Pen(BorderColor);
+            using var pen = new Pen(Theme.BorderColor);
             e.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
         };
         Controls.Add(card);
@@ -84,7 +79,7 @@ public class LoginForm : Form
             Location = new Point(20, y),
             AutoSize = true,
             Font = TitleFont,
-            ForeColor = TextColor
+            ForeColor = Theme.TextColor
         };
         card.Controls.Add(title);
         y += 36;
@@ -95,19 +90,32 @@ public class LoginForm : Form
             Location = new Point(20, y),
             AutoSize = true,
             Font = LabelFont,
-            ForeColor = LabelColor
+            ForeColor = Theme.LabelColor
         };
         card.Controls.Add(label);
+
+        var showCheck = new CheckBox
+        {
+            Text = "Show",
+            Location = new Point(card.Width - 80, y - 2),
+            AutoSize = true,
+            Checked = true,
+            Font = LabelFont,
+            ForeColor = Theme.LabelColor,
+            BackColor = Theme.SurfaceColor
+        };
+        showCheck.CheckedChanged += (_, _) =>
+            _passwordBox.UseSystemPasswordChar = !showCheck.Checked;
+        card.Controls.Add(showCheck);
         y += 22;
 
         _passwordBox = new TextBox
         {
             Location = new Point(20, y),
             Size = new Size(card.Width - 40, 28),
-            UseSystemPasswordChar = true,
             Font = MainFont,
-            BackColor = Color.White,
-            ForeColor = TextColor,
+            BackColor = Theme.InputBg,
+            ForeColor = Theme.TextColor,
             BorderStyle = BorderStyle.FixedSingle
         };
         card.Controls.Add(_passwordBox);
@@ -121,7 +129,7 @@ public class LoginForm : Form
                 Location = new Point(20, y),
                 AutoSize = true,
                 Font = LabelFont,
-                ForeColor = LabelColor
+                ForeColor = Theme.LabelColor
             };
             card.Controls.Add(confirmLabel);
             y += 22;
@@ -132,8 +140,8 @@ public class LoginForm : Form
                 Size = new Size(card.Width - 40, 28),
                 UseSystemPasswordChar = true,
                 Font = MainFont,
-                BackColor = Color.White,
-                ForeColor = TextColor,
+                BackColor = Theme.InputBg,
+                ForeColor = Theme.TextColor,
                 BorderStyle = BorderStyle.FixedSingle
             };
             card.Controls.Add(_confirmBox);
@@ -147,13 +155,13 @@ public class LoginForm : Form
             Size = new Size(card.Width - 40, 34),
             FlatStyle = FlatStyle.Flat,
             Font = ButtonFont,
-            BackColor = AccentColor,
+            BackColor = Theme.AccentColor,
             ForeColor = Color.White,
             Cursor = Cursors.Hand,
             FlatAppearance =
             {
                 BorderSize = 0,
-                MouseOverBackColor = AccentHover
+                MouseOverBackColor = Theme.AccentHover
             }
         };
         _unlockButton.Click += OnUnlockClick;
@@ -164,7 +172,7 @@ public class LoginForm : Form
         {
             Location = new Point(20, y + 40),
             AutoSize = true,
-            ForeColor = Color.FromArgb(210, 60, 60),
+            ForeColor = Theme.DangerColor,
             Font = LabelFont
         };
         card.Controls.Add(_errorLabel);

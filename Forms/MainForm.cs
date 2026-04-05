@@ -19,27 +19,11 @@ public class MainForm : Form
     private const int EM_SETMARGINS = 0xD3;
     private const int EC_LEFTMARGIN = 0x1;
 
-    // Modern light theme colors
-    private static readonly Color BgColor = Color.FromArgb(245, 245, 245);
-    private static readonly Color SurfaceColor = Color.White;
-    private static readonly Color BorderColor = Color.FromArgb(218, 220, 224);
-    private static readonly Color TextColor = Color.FromArgb(51, 51, 51);
-    private static readonly Color LabelColor = Color.FromArgb(100, 100, 100);
-    private static readonly Color AccentColor = Color.FromArgb(0, 120, 212);
-    private static readonly Color AccentHover = Color.FromArgb(0, 100, 180);
-    private static readonly Color DangerColor = Color.FromArgb(210, 60, 60);
-    private static readonly Color ListSelectColor = Color.FromArgb(230, 240, 255);
-    private static readonly Color MenuBg = Color.White;
-    private static readonly Color GoldColor = Color.FromArgb(218, 165, 32);
-    private static readonly Color HeaderBg = Color.FromArgb(0, 120, 212);
-
     private static readonly Font MainFont = new("Segoe UI", 9.5f);
     private static readonly Font LabelFont = new("Segoe UI", 8.5f);
     private static readonly Font SearchFont = new("Segoe UI", 10f);
     private static readonly Font ListFont = new("Segoe UI", 9.5f);
     private static readonly Font ButtonFont = new("Segoe UI Semibold", 9f);
-    private static readonly Font HeaderFont = new("Segoe UI Semibold", 12f);
-    private static readonly Font HeaderFileFont = new("Segoe UI", 9f);
 
     private VaultService _vault;
     private List<VaultEntry> _filtered = new();
@@ -64,16 +48,29 @@ public class MainForm : Form
     private Button _copyUserButton = null!;
     private Button _copyPassButton = null!;
     private Button _copyUrlButton = null!;
+    private CheckBox _darkModeCheck = null!;
+
+    // Structural controls for theming
+    private MenuStrip _menuStrip = null!;
+    private Panel _contentPanel = null!;
+    private SplitContainer _split = null!;
+    private Panel _card = null!;
+    private Panel _innerPanel = null!;
+    private FlowLayoutPanel _buttonPanel = null!;
+    private Panel _searchPanel = null!;
+    private List<Label> _labels = new();
 
     public MainForm(VaultService vault)
     {
         _vault = vault;
         _filtered = new List<VaultEntry>(vault.Entries);
+        Theme.SetDarkMode(ConfigService.LoadDarkMode());
         Icon = CreateKeyIcon();
         InitializeUI();
         RefreshList();
         SetNewMode();
         UpdateTitle();
+        FormClosed += (_, _) => _vault.Dispose();
     }
 
     private void UpdateTitle()
@@ -97,16 +94,11 @@ public class MainForm : Form
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(Color.Transparent);
 
-        using var pen = new Pen(GoldColor, 3f);
+        using var pen = new Pen(Theme.GoldColor, 3f);
 
-        // Key head (ring)
         g.DrawEllipse(pen, 3, 2, 18, 18);
         g.DrawEllipse(pen, 7, 6, 10, 10);
-
-        // Shaft
         g.DrawLine(pen, 18, 16, 40, 38);
-
-        // Teeth
         g.DrawLine(pen, 30, 28, 24, 34);
         g.DrawLine(pen, 34, 32, 28, 38);
         g.DrawLine(pen, 40, 38, 34, 44);
@@ -119,18 +111,18 @@ public class MainForm : Form
         Size = new Size(860, 540);
         MinimumSize = new Size(720, 420);
         StartPosition = FormStartPosition.CenterScreen;
-        BackColor = BgColor;
+        BackColor = Theme.BgColor;
         Font = MainFont;
 
         // Menu bar
-        var menuStrip = new MenuStrip
+        _menuStrip = new MenuStrip
         {
-            BackColor = MenuBg,
-            ForeColor = TextColor,
+            BackColor = Theme.MenuBg,
+            ForeColor = Theme.TextColor,
             Font = MainFont,
             Padding = new Padding(6, 2, 0, 2)
         };
-        menuStrip.Renderer = new ModernMenuRenderer();
+        _menuStrip.Renderer = new ModernMenuRenderer();
 
         var fileMenu = new ToolStripMenuItem("&File");
         fileMenu.DropDownItems.Add("&New Vault...", null, OnMenuNew);
@@ -146,40 +138,39 @@ public class MainForm : Form
         ((ToolStripMenuItem)fileMenu.DropDownItems[3]).ShortcutKeys = Keys.Control | Keys.S;
         ((ToolStripMenuItem)fileMenu.DropDownItems[4]).ShortcutKeys = Keys.Control | Keys.E;
 
-        menuStrip.Items.Add(fileMenu);
-        MainMenuStrip = menuStrip;
+        _menuStrip.Items.Add(fileMenu);
+        MainMenuStrip = _menuStrip;
 
         // Main content panel with padding
-        var contentPanel = new Panel
+        _contentPanel = new Panel
         {
             Dock = DockStyle.Fill,
             Padding = new Padding(12, 8, 12, 12),
-            BackColor = BgColor
+            BackColor = Theme.BgColor
         };
 
-        var split = new SplitContainer
+        _split = new SplitContainer
         {
             Dock = DockStyle.Fill,
             SplitterDistance = 240,
             FixedPanel = FixedPanel.Panel1,
             SplitterWidth = 8,
-            BackColor = BgColor
+            BackColor = Theme.BgColor
         };
-        split.Panel1.BackColor = BgColor;
-        split.Panel2.BackColor = BgColor;
+        _split.Panel1.BackColor = Theme.BgColor;
+        _split.Panel2.BackColor = Theme.BgColor;
 
-        contentPanel.Controls.Add(split);
-        Controls.Add(contentPanel);
-        Controls.Add(menuStrip);
+        _contentPanel.Controls.Add(_split);
+        Controls.Add(_contentPanel);
+        Controls.Add(_menuStrip);
 
-        BuildLeftPane(split.Panel1);
-        BuildRightPane(split.Panel2);
+        BuildLeftPane(_split.Panel1);
+        BuildRightPane(_split.Panel2);
     }
 
     private void BuildLeftPane(SplitterPanel panel)
     {
-        // Search box with padding wrapper
-        var searchPanel = new Panel
+        _searchPanel = new Panel
         {
             Dock = DockStyle.Top,
             Height = 36,
@@ -191,20 +182,20 @@ public class MainForm : Form
             Dock = DockStyle.Fill,
             PlaceholderText = "\U0001F50D  Search...",
             Font = SearchFont,
-            BackColor = SurfaceColor,
-            ForeColor = TextColor,
+            BackColor = Theme.InputBg,
+            ForeColor = Theme.TextColor,
             BorderStyle = BorderStyle.FixedSingle
         };
         _searchBox.TextChanged += (_, _) => ApplyFilter();
-        searchPanel.Controls.Add(_searchBox);
+        _searchPanel.Controls.Add(_searchBox);
 
         _entryList = new ListBox
         {
             Dock = DockStyle.Fill,
             IntegralHeight = false,
             Font = ListFont,
-            BackColor = SurfaceColor,
-            ForeColor = TextColor,
+            BackColor = Theme.SurfaceColor,
+            ForeColor = Theme.TextColor,
             BorderStyle = BorderStyle.FixedSingle,
             DrawMode = DrawMode.OwnerDrawFixed,
             ItemHeight = 30
@@ -213,7 +204,7 @@ public class MainForm : Form
         _entryList.SelectedIndexChanged += OnEntrySelected;
 
         panel.Controls.Add(_entryList);
-        panel.Controls.Add(searchPanel);
+        panel.Controls.Add(_searchPanel);
     }
 
     private void OnDrawListItem(object? sender, DrawItemEventArgs e)
@@ -221,8 +212,8 @@ public class MainForm : Form
         if (e.Index < 0) return;
 
         var isSelected = (e.State & DrawItemState.Selected) != 0;
-        var bg = isSelected ? ListSelectColor : SurfaceColor;
-        var fg = TextColor;
+        var bg = isSelected ? Theme.ListSelectColor : Theme.SurfaceColor;
+        var fg = Theme.TextColor;
 
         using var bgBrush = new SolidBrush(bg);
         e.Graphics.FillRectangle(bgBrush, e.Bounds);
@@ -234,29 +225,28 @@ public class MainForm : Form
 
         if (isSelected)
         {
-            using var accentPen = new Pen(AccentColor, 3);
+            using var accentPen = new Pen(Theme.AccentColor, 3);
             e.Graphics.DrawLine(accentPen, e.Bounds.Left, e.Bounds.Top, e.Bounds.Left, e.Bounds.Bottom);
         }
     }
 
     private void BuildRightPane(SplitterPanel panel)
     {
-        // White card surface
-        var card = new Panel
+        _card = new Panel
         {
             Dock = DockStyle.Fill,
-            BackColor = SurfaceColor,
+            BackColor = Theme.SurfaceColor,
             Padding = new Padding(20, 16, 20, 16)
         };
-        card.Paint += (_, e) =>
+        _card.Paint += (_, e) =>
         {
-            using var pen = new Pen(BorderColor);
-            e.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
+            using var pen = new Pen(Theme.BorderColor);
+            e.Graphics.DrawRectangle(pen, 0, 0, _card.Width - 1, _card.Height - 1);
         };
-        panel.Controls.Add(card);
+        panel.Controls.Add(_card);
 
-        var inner = new Panel { Dock = DockStyle.Fill };
-        card.Controls.Add(inner);
+        _innerPanel = new Panel { Dock = DockStyle.Fill };
+        _card.Controls.Add(_innerPanel);
 
         int y = 0;
         const int labelW = 80;
@@ -266,121 +256,248 @@ public class MainForm : Form
         int tabIdx = 0;
 
         // Title
-        inner.Controls.Add(MakeLabel("Title", y));
-        _titleBox = MakeTextBox(labelW, y, inner.Width - labelW - 8);
+        _labels.Add(MakeLabel("Title", y));
+        _innerPanel.Controls.Add(_labels[^1]);
+        _titleBox = MakeTextBox(labelW, y, _innerPanel.Width - labelW - 8);
         _titleBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         _titleBox.TabIndex = tabIdx++;
-        inner.Controls.Add(_titleBox);
+        _innerPanel.Controls.Add(_titleBox);
         y += rowH + gap;
 
         // Username
-        inner.Controls.Add(MakeLabel("Username", y));
-        _usernameBox = MakeTextBox(labelW, y, inner.Width - labelW - copyW - 16);
+        _labels.Add(MakeLabel("Username", y));
+        _innerPanel.Controls.Add(_labels[^1]);
+        _usernameBox = MakeTextBox(labelW, y, _innerPanel.Width - labelW - copyW - 16);
         _usernameBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         _usernameBox.TabIndex = tabIdx++;
-        inner.Controls.Add(_usernameBox);
-        _copyUserButton = MakeSmallButton("Copy", inner.Width - copyW - 4, y, copyW);
+        _innerPanel.Controls.Add(_usernameBox);
+        _copyUserButton = MakeSmallButton("Copy", _innerPanel.Width - copyW - 4, y, copyW);
         _copyUserButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         _copyUserButton.TabStop = false;
         _copyUserButton.Click += (_, _) => CopyToClipboard(_usernameBox.Text);
-        inner.Controls.Add(_copyUserButton);
+        _innerPanel.Controls.Add(_copyUserButton);
         y += rowH + gap;
 
         // Password
-        inner.Controls.Add(MakeLabel("Password", y));
-        _passwordBox = MakeTextBox(labelW, y, inner.Width - labelW - copyW - 76);
+        _labels.Add(MakeLabel("Password", y));
+        _innerPanel.Controls.Add(_labels[^1]);
+        _passwordBox = MakeTextBox(labelW, y, _innerPanel.Width - labelW - copyW - 76);
         _passwordBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         _passwordBox.TabIndex = tabIdx++;
-        inner.Controls.Add(_passwordBox);
+        _innerPanel.Controls.Add(_passwordBox);
 
         _showPassword = new CheckBox
         {
             Text = "Show",
-            Location = new Point(inner.Width - copyW - 66, y + 2),
+            Location = new Point(_innerPanel.Width - copyW - 66, y + 2),
             Size = new Size(58, rowH - 4),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             Checked = true,
             TabStop = false,
             Font = LabelFont,
-            ForeColor = LabelColor,
-            FlatStyle = FlatStyle.Flat
+            ForeColor = Theme.LabelColor
         };
         _showPassword.CheckedChanged += (_, _) =>
             _passwordBox.UseSystemPasswordChar = !_showPassword.Checked;
-        inner.Controls.Add(_showPassword);
+        _innerPanel.Controls.Add(_showPassword);
 
-        _copyPassButton = MakeSmallButton("Copy", inner.Width - copyW - 4, y, copyW);
+        _copyPassButton = MakeSmallButton("Copy", _innerPanel.Width - copyW - 4, y, copyW);
         _copyPassButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         _copyPassButton.TabStop = false;
         _copyPassButton.Click += (_, _) => CopyToClipboard(_passwordBox.Text);
-        inner.Controls.Add(_copyPassButton);
+        _innerPanel.Controls.Add(_copyPassButton);
         y += rowH + gap;
 
         // Generate password
         _generateButton = MakeAccentButton("Generate Password", labelW, y, 150);
         _generateButton.TabStop = false;
         _generateButton.Click += OnGenerateClick;
-        inner.Controls.Add(_generateButton);
+        _innerPanel.Controls.Add(_generateButton);
         y += rowH + gap + 2;
 
         // URL
-        inner.Controls.Add(MakeLabel("URL", y));
-        _urlBox = MakeTextBox(labelW, y, inner.Width - labelW - copyW - 16);
+        _labels.Add(MakeLabel("URL", y));
+        _innerPanel.Controls.Add(_labels[^1]);
+        _urlBox = MakeTextBox(labelW, y, _innerPanel.Width - labelW - copyW - 16);
         _urlBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         _urlBox.TabIndex = tabIdx++;
-        inner.Controls.Add(_urlBox);
-        _copyUrlButton = MakeSmallButton("Copy", inner.Width - copyW - 4, y, copyW);
+        _innerPanel.Controls.Add(_urlBox);
+        _copyUrlButton = MakeSmallButton("Copy", _innerPanel.Width - copyW - 4, y, copyW);
         _copyUrlButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         _copyUrlButton.TabStop = false;
         _copyUrlButton.Click += (_, _) => CopyToClipboard(_urlBox.Text);
-        inner.Controls.Add(_copyUrlButton);
+        _innerPanel.Controls.Add(_copyUrlButton);
         y += rowH + gap;
 
         // Notes
-        inner.Controls.Add(MakeLabel("Notes", y));
+        _labels.Add(MakeLabel("Notes", y));
+        _innerPanel.Controls.Add(_labels[^1]);
         _notesBox = new TextBox
         {
             Location = new Point(labelW, y),
-            Size = new Size(inner.Width - labelW - 8, 90),
+            Size = new Size(_innerPanel.Width - labelW - 8, 90),
             Multiline = true,
             ScrollBars = ScrollBars.Vertical,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
             TabIndex = tabIdx++,
             AcceptsTab = false,
             Font = MainFont,
-            BackColor = SurfaceColor,
-            ForeColor = TextColor,
+            BackColor = Theme.InputBg,
+            ForeColor = Theme.TextColor,
             BorderStyle = BorderStyle.FixedSingle
         };
-        inner.Controls.Add(_notesBox);
+        _innerPanel.Controls.Add(_notesBox);
 
         // Button row
-        var buttonPanel = new FlowLayoutPanel
+        _buttonPanel = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.RightToLeft,
             Dock = DockStyle.Bottom,
             Height = 44,
             Padding = new Padding(0, 8, 0, 0),
-            BackColor = SurfaceColor
+            BackColor = Theme.SurfaceColor
         };
 
         _saveButton = MakeAccentButton("Save", 0, 0, 90);
         _saveButton.TabIndex = tabIdx++;
         _saveButton.Click += OnSaveClick;
 
-        _newButton = MakeOutlineButton("New", 0, 0, 90);
+        _newButton = MakeAccentButton("New", 0, 0, 90);
         _newButton.TabIndex = tabIdx++;
         _newButton.Click += OnNewClick;
 
-        _deleteButton = MakeDangerButton("Delete", 0, 0, 90);
+        _deleteButton = MakeDangerFilledButton("Delete", 0, 0, 90);
         _deleteButton.TabIndex = tabIdx++;
         _deleteButton.Click += OnDeleteClick;
 
-        buttonPanel.Controls.Add(_saveButton);
-        buttonPanel.Controls.Add(_newButton);
-        buttonPanel.Controls.Add(_deleteButton);
+        _darkModeCheck = new CheckBox
+        {
+            Text = "Dark Mode",
+            AutoSize = true,
+            Checked = Theme.IsDark,
+            Font = LabelFont,
+            ForeColor = Theme.LabelColor,
+            Margin = new Padding(3, 11, 3, 3),
+            TabStop = false
+        };
+        _darkModeCheck.CheckedChanged += OnDarkModeToggle;
 
-        inner.Controls.Add(buttonPanel);
+        _buttonPanel.Controls.Add(_saveButton);
+        _buttonPanel.Controls.Add(_newButton);
+        _buttonPanel.Controls.Add(_deleteButton);
+
+        // Spacer to push dark mode checkbox to the left
+        var spacer = new Control { Width = 1, Height = 1 };
+        spacer.Dock = DockStyle.None;
+        _buttonPanel.Controls.Add(spacer);
+        _buttonPanel.SetFlowBreak(spacer, false);
+
+        _innerPanel.Controls.Add(_buttonPanel);
+
+        // Dark mode checkbox in its own left-aligned panel at the bottom
+        var darkPanel = new Panel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 36,
+            BackColor = Theme.SurfaceColor
+        };
+        _darkModeCheck.Location = new Point(0, 8);
+        darkPanel.Controls.Add(_darkModeCheck);
+        _innerPanel.Controls.Add(darkPanel);
+    }
+
+    private void OnDarkModeToggle(object? sender, EventArgs e)
+    {
+        Theme.SetDarkMode(_darkModeCheck.Checked);
+        ConfigService.SaveDarkMode(_darkModeCheck.Checked);
+        ApplyTheme();
+    }
+
+    private void ApplyTheme()
+    {
+        SuspendLayout();
+
+        // Form
+        BackColor = Theme.BgColor;
+
+        // Menu
+        _menuStrip.BackColor = Theme.MenuBg;
+        _menuStrip.ForeColor = Theme.TextColor;
+        _menuStrip.Renderer = new ModernMenuRenderer();
+        foreach (ToolStripItem item in _menuStrip.Items)
+        {
+            item.ForeColor = Theme.TextColor;
+            if (item is ToolStripMenuItem mi)
+                foreach (ToolStripItem sub in mi.DropDownItems)
+                    sub.ForeColor = Theme.TextColor;
+        }
+
+        // Content & split
+        _contentPanel.BackColor = Theme.BgColor;
+        _split.BackColor = Theme.BgColor;
+        _split.Panel1.BackColor = Theme.BgColor;
+        _split.Panel2.BackColor = Theme.BgColor;
+
+        // Search
+        _searchBox.BackColor = Theme.InputBg;
+        _searchBox.ForeColor = Theme.TextColor;
+
+        // List
+        _entryList.BackColor = Theme.SurfaceColor;
+        _entryList.ForeColor = Theme.TextColor;
+
+        // Card
+        _card.BackColor = Theme.SurfaceColor;
+        _innerPanel.BackColor = Theme.SurfaceColor;
+
+        // Labels
+        foreach (var lbl in _labels)
+            lbl.ForeColor = Theme.LabelColor;
+
+        // Text boxes
+        foreach (var tb in new[] { _titleBox, _usernameBox, _passwordBox, _urlBox, _notesBox })
+        {
+            tb.BackColor = Theme.InputBg;
+            tb.ForeColor = Theme.TextColor;
+        }
+
+        // Show password checkbox
+        _showPassword.ForeColor = Theme.LabelColor;
+        _showPassword.BackColor = Theme.SurfaceColor;
+
+        // Copy buttons
+        foreach (var btn in new[] { _copyUserButton, _copyPassButton, _copyUrlButton })
+        {
+            btn.BackColor = Theme.SmallButtonBg;
+            btn.ForeColor = Theme.TextColor;
+            btn.FlatAppearance.BorderColor = Theme.BorderColor;
+            btn.FlatAppearance.MouseOverBackColor = Theme.SmallButtonHover;
+        }
+
+        // Accent buttons
+        foreach (var btn in new[] { _saveButton, _generateButton, _newButton })
+        {
+            btn.BackColor = Theme.AccentColor;
+            btn.ForeColor = Color.White;
+            btn.FlatAppearance.MouseOverBackColor = Theme.AccentHover;
+        }
+
+        // Danger filled button
+        _deleteButton.BackColor = Theme.DangerColor;
+        _deleteButton.ForeColor = Color.White;
+        _deleteButton.FlatAppearance.MouseOverBackColor = Theme.DangerHover;
+
+        // Button panel & dark mode
+        _buttonPanel.BackColor = Theme.SurfaceColor;
+        _darkModeCheck.ForeColor = Theme.LabelColor;
+        _darkModeCheck.BackColor = Theme.SurfaceColor;
+        _darkModeCheck.Parent!.BackColor = Theme.SurfaceColor;
+
+        // Force list repaint
+        _entryList.Invalidate();
+        _card.Invalidate();
+
+        ResumeLayout(true);
     }
 
     // --- Styled control factories ---
@@ -392,7 +509,7 @@ public class MainForm : Form
             Location = new Point(0, y + 5),
             AutoSize = true,
             Font = LabelFont,
-            ForeColor = LabelColor
+            ForeColor = Theme.LabelColor
         };
 
     private static TextBox MakeTextBox(int x, int y, int width)
@@ -402,8 +519,8 @@ public class MainForm : Form
             Location = new Point(x, y),
             Size = new Size(width, 26),
             Font = MainFont,
-            BackColor = Color.White,
-            ForeColor = TextColor,
+            BackColor = Theme.InputBg,
+            ForeColor = Theme.TextColor,
             BorderStyle = BorderStyle.FixedSingle
         };
         tb.HandleCreated += (_, _) =>
@@ -419,13 +536,13 @@ public class MainForm : Form
             Size = new Size(width, 26),
             FlatStyle = FlatStyle.Flat,
             Font = LabelFont,
-            BackColor = BgColor,
-            ForeColor = TextColor,
+            BackColor = Theme.SmallButtonBg,
+            ForeColor = Theme.TextColor,
             FlatAppearance =
             {
-                BorderColor = BorderColor,
+                BorderColor = Theme.BorderColor,
                 BorderSize = 1,
-                MouseOverBackColor = Color.FromArgb(230, 230, 230)
+                MouseOverBackColor = Theme.SmallButtonHover
             },
             Cursor = Cursors.Hand
         };
@@ -438,17 +555,17 @@ public class MainForm : Form
             Size = new Size(width, 32),
             FlatStyle = FlatStyle.Flat,
             Font = ButtonFont,
-            BackColor = AccentColor,
+            BackColor = Theme.AccentColor,
             ForeColor = Color.White,
             FlatAppearance =
             {
                 BorderSize = 0,
-                MouseOverBackColor = AccentHover
+                MouseOverBackColor = Theme.AccentHover
             },
             Cursor = Cursors.Hand
         };
 
-    private static Button MakeOutlineButton(string text, int x, int y, int width) =>
+    private static Button MakeDangerFilledButton(string text, int x, int y, int width) =>
         new()
         {
             Text = text,
@@ -456,32 +573,12 @@ public class MainForm : Form
             Size = new Size(width, 32),
             FlatStyle = FlatStyle.Flat,
             Font = ButtonFont,
-            BackColor = SurfaceColor,
-            ForeColor = AccentColor,
+            BackColor = Theme.DangerColor,
+            ForeColor = Color.White,
             FlatAppearance =
             {
-                BorderColor = AccentColor,
-                BorderSize = 1,
-                MouseOverBackColor = Color.FromArgb(230, 240, 255)
-            },
-            Cursor = Cursors.Hand
-        };
-
-    private static Button MakeDangerButton(string text, int x, int y, int width) =>
-        new()
-        {
-            Text = text,
-            Location = new Point(x, y),
-            Size = new Size(width, 32),
-            FlatStyle = FlatStyle.Flat,
-            Font = ButtonFont,
-            BackColor = SurfaceColor,
-            ForeColor = DangerColor,
-            FlatAppearance =
-            {
-                BorderColor = DangerColor,
-                BorderSize = 1,
-                MouseOverBackColor = Color.FromArgb(255, 235, 235)
+                BorderSize = 0,
+                MouseOverBackColor = Theme.DangerHover
             },
             Cursor = Cursors.Hand
         };
@@ -713,7 +810,7 @@ public class MainForm : Form
             if (answer != DialogResult.Yes) return;
         }
 
-        using var loginForm = new LoginForm(isNewVault: false);
+        using var loginForm = new LoginForm(isNewVault: false, ofd.FileName);
         if (loginForm.ShowDialog() != DialogResult.OK) return;
 
         try
@@ -810,18 +907,16 @@ public class MainForm : Form
     }
 }
 
-// Custom renderer to remove the blue highlight bar on menu items
+// Custom renderer using Theme colors
 internal class ModernMenuRenderer : ToolStripProfessionalRenderer
 {
-    private static readonly Color MenuHover = Color.FromArgb(230, 240, 255);
-
     public ModernMenuRenderer() : base(new ModernColorTable()) { }
 
     protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
     {
         if (e.Item.Selected || e.Item.Pressed)
         {
-            using var brush = new SolidBrush(MenuHover);
+            using var brush = new SolidBrush(Theme.MenuHover);
             e.Graphics.FillRectangle(brush, e.Item.ContentRectangle);
         }
     }
@@ -829,15 +924,15 @@ internal class ModernMenuRenderer : ToolStripProfessionalRenderer
 
 internal class ModernColorTable : ProfessionalColorTable
 {
-    public override Color MenuBorder => Color.FromArgb(218, 220, 224);
+    public override Color MenuBorder => Theme.MenuBorder;
     public override Color MenuItemBorder => Color.Transparent;
-    public override Color MenuItemSelected => Color.FromArgb(230, 240, 255);
-    public override Color MenuStripGradientBegin => Color.White;
-    public override Color MenuStripGradientEnd => Color.White;
-    public override Color ToolStripDropDownBackground => Color.White;
-    public override Color ImageMarginGradientBegin => Color.White;
-    public override Color ImageMarginGradientMiddle => Color.White;
-    public override Color ImageMarginGradientEnd => Color.White;
-    public override Color SeparatorDark => Color.FromArgb(230, 230, 230);
-    public override Color SeparatorLight => Color.White;
+    public override Color MenuItemSelected => Theme.MenuHover;
+    public override Color MenuStripGradientBegin => Theme.MenuBg;
+    public override Color MenuStripGradientEnd => Theme.MenuBg;
+    public override Color ToolStripDropDownBackground => Theme.MenuBg;
+    public override Color ImageMarginGradientBegin => Theme.MenuBg;
+    public override Color ImageMarginGradientMiddle => Theme.MenuBg;
+    public override Color ImageMarginGradientEnd => Theme.MenuBg;
+    public override Color SeparatorDark => Theme.SeparatorColor;
+    public override Color SeparatorLight => Theme.MenuBg;
 }

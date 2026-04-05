@@ -11,9 +11,13 @@ static class Program
     [STAThread]
     static void Main()
     {
+        try
+        {
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         Application.SetHighDpiMode(HighDpiMode.SystemAware);
+
+        Theme.SetDarkMode(ConfigService.LoadDarkMode());
 
         var vault = new VaultService();
 
@@ -36,7 +40,7 @@ static class Program
             // Retry loop for wrong password
             while (true)
             {
-                using var loginForm = new LoginForm(isNewVault: false);
+                using var loginForm = new LoginForm(isNewVault: false, vaultPath);
                 if (loginForm.ShowDialog() != DialogResult.OK)
                     return; // User cancelled — exit app
 
@@ -66,6 +70,12 @@ static class Program
         using (vault)
         {
             Application.Run(new MainForm(vault));
+        }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Fatal error:\n{ex}", "Pass - Error",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }

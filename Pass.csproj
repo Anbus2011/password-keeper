@@ -11,5 +11,6 @@
     <RootNamespace>Pass</RootNamespace>
     <Nullable>enable</Nullable>
     <ApplicationIcon>app.ico</ApplicationIcon>
+    <PublishDir>$(USERPROFILE)\Desktop</PublishDir>
   </PropertyGroup>
 </Project>

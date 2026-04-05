@@ -38,10 +38,10 @@ dotnet run
 ### Publish a Portable EXE
 
 ```bash
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=true
+dotnet publish -c Release
 ```
 
-The output is a single file at `bin\Release\net9.0-windows\win-x64\publish\Pass.exe`. Copy it anywhere and run — no installation required.
+This produces a single self-contained `Pass.exe` (~120 MB) on your Desktop. The EXE bundles the entire .NET runtime — no installation or dependencies needed on the target machine. Copy it anywhere and run.
 
 ## Usage
 
