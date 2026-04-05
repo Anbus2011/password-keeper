@@ -30,8 +30,8 @@ Pass encrypts your passwords in a single `.vlt` file that can live on a shared n
 ### Build and Run
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/Pass.git
-cd Pass
+git clone https://github.com/Anbus2011/password-keeper.git
+cd password-keeper
 dotnet run
 ```
 
