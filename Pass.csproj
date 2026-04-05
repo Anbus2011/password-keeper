@@ -10,5 +10,6 @@
     <AssemblyName>Pass</AssemblyName>
     <RootNamespace>Pass</RootNamespace>
     <Nullable>enable</Nullable>
+    <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
 </Project>
