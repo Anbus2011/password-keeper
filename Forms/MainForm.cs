@@ -42,13 +42,14 @@ public class MainForm : Form
     private TextBox _urlBox = null!;
     private TextBox _notesBox = null!;
     private Button _newButton = null!;
+    private Button _editButton = null!;
     private Button _saveButton = null!;
     private Button _deleteButton = null!;
     private Button _generateButton = null!;
     private Button _copyUserButton = null!;
     private Button _copyPassButton = null!;
     private Button _copyUrlButton = null!;
-    private CheckBox _darkModeCheck = null!;
+    private ToolStripMenuItem _darkModeMenuItem = null!;
 
     // Structural controls for theming
     private MenuStrip _menuStrip = null!;
@@ -67,10 +68,60 @@ public class MainForm : Form
         Theme.SetDarkMode(ConfigService.LoadDarkMode());
         Icon = CreateKeyIcon();
         InitializeUI();
+        RestoreWindowBounds();
+        if (Theme.IsDark) ApplyTheme();
         RefreshList();
         SetNewMode();
         UpdateTitle();
+        FormClosing += OnFormClosing;
         FormClosed += (_, _) => _vault.Dispose();
+    }
+
+    private void RestoreWindowBounds()
+    {
+        var (x, y, w, h, maximized, splitter) = ConfigService.LoadWindowBounds();
+        if (w.HasValue && h.HasValue)
+        {
+            var rect = new Rectangle(x ?? 0, y ?? 0, w.Value, h.Value);
+
+            // Check that the saved position is at least partially visible
+            bool onScreen = false;
+            foreach (var screen in Screen.AllScreens)
+            {
+                if (screen.WorkingArea.IntersectsWith(rect))
+                {
+                    onScreen = true;
+                    break;
+                }
+            }
+
+            if (onScreen)
+            {
+                StartPosition = FormStartPosition.Manual;
+                Location = new Point(rect.X, rect.Y);
+            }
+
+            Size = new Size(rect.Width, rect.Height);
+
+            if (maximized)
+                WindowState = FormWindowState.Maximized;
+        }
+
+        if (splitter.HasValue && splitter.Value > 0)
+            _split.SplitterDistance = splitter.Value;
+    }
+
+    private void OnFormClosing(object? sender, FormClosingEventArgs e)
+    {
+        // Save the normal (non-maximized) bounds so restore works correctly
+        var bounds = WindowState == FormWindowState.Normal
+            ? new Rectangle(Location, Size)
+            : RestoreBounds;
+
+        ConfigService.SaveWindowBounds(
+            bounds.X, bounds.Y, bounds.Width, bounds.Height,
+            WindowState == FormWindowState.Maximized,
+            _split.SplitterDistance);
     }
 
     private void UpdateTitle()
@@ -130,6 +181,14 @@ public class MainForm : Form
         fileMenu.DropDownItems.Add(new ToolStripSeparator());
         fileMenu.DropDownItems.Add("&Save", null, OnMenuSave);
         fileMenu.DropDownItems.Add("Export As &Text...", null, OnMenuExportText);
+        fileMenu.DropDownItems.Add(new ToolStripSeparator());
+        _darkModeMenuItem = new ToolStripMenuItem("&Dark Mode")
+        {
+            CheckOnClick = true,
+            Checked = Theme.IsDark
+        };
+        _darkModeMenuItem.CheckedChanged += OnDarkModeToggle;
+        fileMenu.DropDownItems.Add(_darkModeMenuItem);
         fileMenu.DropDownItems.Add(new ToolStripSeparator());
         fileMenu.DropDownItems.Add("&Close", null, (_, _) => Close());
 
@@ -196,7 +255,7 @@ public class MainForm : Form
             Font = ListFont,
             BackColor = Theme.SurfaceColor,
             ForeColor = Theme.TextColor,
-            BorderStyle = BorderStyle.FixedSingle,
+            BorderStyle = BorderStyle.Fixed3D,
             DrawMode = DrawMode.OwnerDrawFixed,
             ItemHeight = 30
         };
@@ -344,7 +403,7 @@ public class MainForm : Form
             Font = MainFont,
             BackColor = Theme.InputBg,
             ForeColor = Theme.TextColor,
-            BorderStyle = BorderStyle.FixedSingle
+            BorderStyle = BorderStyle.Fixed3D
         };
         _innerPanel.Controls.Add(_notesBox);
 
@@ -366,50 +425,27 @@ public class MainForm : Form
         _newButton.TabIndex = tabIdx++;
         _newButton.Click += OnNewClick;
 
+        _editButton = MakeDangerFilledButton("Edit", 0, 0, 90);
+        _editButton.TabIndex = tabIdx++;
+        _editButton.Click += OnEditClick;
+
         _deleteButton = MakeDangerFilledButton("Delete", 0, 0, 90);
         _deleteButton.TabIndex = tabIdx++;
         _deleteButton.Click += OnDeleteClick;
 
-        _darkModeCheck = new CheckBox
-        {
-            Text = "Dark Mode",
-            AutoSize = true,
-            Checked = Theme.IsDark,
-            Font = LabelFont,
-            ForeColor = Theme.LabelColor,
-            Margin = new Padding(3, 11, 3, 3),
-            TabStop = false
-        };
-        _darkModeCheck.CheckedChanged += OnDarkModeToggle;
-
+        // RightToLeft flow: first added = rightmost. Order: Delete, Edit, New, Save
         _buttonPanel.Controls.Add(_saveButton);
         _buttonPanel.Controls.Add(_newButton);
+        _buttonPanel.Controls.Add(_editButton);
         _buttonPanel.Controls.Add(_deleteButton);
 
-        // Spacer to push dark mode checkbox to the left
-        var spacer = new Control { Width = 1, Height = 1 };
-        spacer.Dock = DockStyle.None;
-        _buttonPanel.Controls.Add(spacer);
-        _buttonPanel.SetFlowBreak(spacer, false);
-
         _innerPanel.Controls.Add(_buttonPanel);
-
-        // Dark mode checkbox in its own left-aligned panel at the bottom
-        var darkPanel = new Panel
-        {
-            Dock = DockStyle.Bottom,
-            Height = 36,
-            BackColor = Theme.SurfaceColor
-        };
-        _darkModeCheck.Location = new Point(0, 8);
-        darkPanel.Controls.Add(_darkModeCheck);
-        _innerPanel.Controls.Add(darkPanel);
     }
 
     private void OnDarkModeToggle(object? sender, EventArgs e)
     {
-        Theme.SetDarkMode(_darkModeCheck.Checked);
-        ConfigService.SaveDarkMode(_darkModeCheck.Checked);
+        Theme.SetDarkMode(_darkModeMenuItem.Checked);
+        ConfigService.SaveDarkMode(_darkModeMenuItem.Checked);
         ApplyTheme();
     }
 
@@ -482,16 +518,16 @@ public class MainForm : Form
             btn.FlatAppearance.MouseOverBackColor = Theme.AccentHover;
         }
 
-        // Danger filled button
-        _deleteButton.BackColor = Theme.DangerColor;
-        _deleteButton.ForeColor = Color.White;
-        _deleteButton.FlatAppearance.MouseOverBackColor = Theme.DangerHover;
+        // Danger filled buttons
+        foreach (var btn in new[] { _deleteButton, _editButton })
+        {
+            btn.BackColor = Theme.DangerColor;
+            btn.ForeColor = Color.White;
+            btn.FlatAppearance.MouseOverBackColor = Theme.DangerHover;
+        }
 
-        // Button panel & dark mode
+        // Button panel
         _buttonPanel.BackColor = Theme.SurfaceColor;
-        _darkModeCheck.ForeColor = Theme.LabelColor;
-        _darkModeCheck.BackColor = Theme.SurfaceColor;
-        _darkModeCheck.Parent!.BackColor = Theme.SurfaceColor;
 
         // Force list repaint
         _entryList.Invalidate();
@@ -591,19 +627,40 @@ public class MainForm : Form
 
     // --- State management ---
 
+    private void SetFieldsEditable(bool editable)
+    {
+        _titleBox.ReadOnly = !editable;
+        _usernameBox.ReadOnly = !editable;
+        _passwordBox.ReadOnly = !editable;
+        _urlBox.ReadOnly = !editable;
+        _notesBox.ReadOnly = !editable;
+        _generateButton.Enabled = editable;
+        _saveButton.Enabled = editable;
+    }
+
     private void SetNewMode()
     {
         _isNew = true;
         _current = new VaultEntry();
-        _saveButton.Text = "Add";
+        SetFieldsEditable(true);
         _deleteButton.Enabled = false;
+        _editButton.Enabled = false;
+    }
+
+    private void SetViewMode()
+    {
+        _isNew = false;
+        SetFieldsEditable(false);
+        _deleteButton.Enabled = true;
+        _editButton.Enabled = true;
     }
 
     private void SetEditMode()
     {
         _isNew = false;
-        _saveButton.Text = "Save";
+        SetFieldsEditable(true);
         _deleteButton.Enabled = true;
+        _editButton.Enabled = false;
     }
 
     private void SetVaultEnabled(bool enabled)
@@ -618,6 +675,7 @@ public class MainForm : Form
         _newButton.Enabled = enabled;
         _saveButton.Enabled = enabled;
         _deleteButton.Enabled = enabled;
+        _editButton.Enabled = enabled;
         _generateButton.Enabled = enabled;
         _showPassword.Enabled = enabled;
     }
@@ -664,7 +722,7 @@ public class MainForm : Form
 
         _current = _filtered[_entryList.SelectedIndex];
         LoadFields(_current);
-        SetEditMode();
+        SetViewMode();
     }
 
     private void LoadFields(VaultEntry entry)
@@ -683,6 +741,13 @@ public class MainForm : Form
         _passwordBox.Text = "";
         _urlBox.Text = "";
         _notesBox.Text = "";
+    }
+
+    private void OnEditClick(object? sender, EventArgs e)
+    {
+        if (_current == null || _isNew) return;
+        SetEditMode();
+        _titleBox.Focus();
     }
 
     private void OnNewClick(object? sender, EventArgs e)
@@ -722,7 +787,7 @@ public class MainForm : Form
 
         _vault.Save();
         ApplyFilter();
-        SetEditMode();
+        SetViewMode();
 
         var idx = _filtered.IndexOf(_current);
         if (idx >= 0)

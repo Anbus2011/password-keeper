@@ -44,9 +44,33 @@ public static class ConfigService
         SaveConfig(config);
     }
 
+    public static (int? x, int? y, int? w, int? h, bool maximized, int? splitter) LoadWindowBounds()
+    {
+        var c = LoadConfig();
+        return (c.WindowX, c.WindowY, c.WindowWidth, c.WindowHeight, c.WindowMaximized, c.SplitterDistance);
+    }
+
+    public static void SaveWindowBounds(int x, int y, int w, int h, bool maximized, int splitter)
+    {
+        var config = LoadConfig();
+        config.WindowX = x;
+        config.WindowY = y;
+        config.WindowWidth = w;
+        config.WindowHeight = h;
+        config.WindowMaximized = maximized;
+        config.SplitterDistance = splitter;
+        SaveConfig(config);
+    }
+
     private class AppConfig
     {
         public string? VaultPath { get; set; }
         public bool DarkMode { get; set; }
+        public int? WindowX { get; set; }
+        public int? WindowY { get; set; }
+        public int? WindowWidth { get; set; }
+        public int? WindowHeight { get; set; }
+        public bool WindowMaximized { get; set; }
+        public int? SplitterDistance { get; set; }
     }
 }
