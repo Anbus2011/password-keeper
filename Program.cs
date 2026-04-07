@@ -1,5 +1,6 @@
 using System;
 using System.Security.Cryptography;
+using System.Threading;
 using System.Windows.Forms;
 using Pass.Forms;
 using Pass.Services;
@@ -11,6 +12,13 @@ static class Program
     [STAThread]
     static void Main()
     {
+        using var mutex = new Mutex(true, "Pass-PasswordManager-SingleInstance", out bool isNew);
+        if (!isNew)
+        {
+            MessageBox.Show("Pass is already running.", "Pass", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
         try
         {
         Application.EnableVisualStyles();
